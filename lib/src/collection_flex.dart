@@ -81,10 +81,10 @@ class CollectionFlex<T> extends StatefulWidget {
   final Axis direction;
 
   @override
-  State<CollectionFlex> createState() => _CollectionFlexState();
+  State<CollectionFlex<T>> createState() => _CollectionFlexState<T>();
 }
 
-class _CollectionFlexState extends State<CollectionFlex> {
+class _CollectionFlexState<T> extends State<CollectionFlex<T>> {
   @override
   Widget build(BuildContext context) {
     // TODO: implement delete with horizontal swipe action
