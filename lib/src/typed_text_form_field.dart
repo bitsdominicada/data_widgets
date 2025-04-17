@@ -4,6 +4,56 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'dart:math';
+
+// Formateador para moneda
+class CurrencyInputFormatter extends TextInputFormatter {
+  final NumberFormat format;
+  CurrencyInputFormatter(this.format);
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // Extraer solo dígitos
+    final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) {
+      return const TextEditingValue(text: '');
+    }
+    // Convertir a número considerando los dígitos decimales
+    final intDecimal = format.decimalDigits ?? 0;
+    final value = double.parse(digits) / pow(10, intDecimal);
+    final newText = format.format(value);
+    return TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newText.length),
+    );
+  }
+}
+
+// Formateador para teléfono (estilo US: (###) ###-####)
+class PhoneInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final buffer = StringBuffer();
+    for (int i = 0; i < digits.length && i < 10; i++) {
+      if (i == 0) buffer.write('(');
+      if (i == 3) buffer.write(') ');
+      if (i == 6) buffer.write('-');
+      buffer.write(digits[i]);
+    }
+    final newText = buffer.toString();
+    return TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newText.length),
+    );
+  }
+}
 
 class IntTextFormField extends StatelessWidget {
   const IntTextFormField({
@@ -493,9 +543,7 @@ class CurrencyTextFormField extends StatelessWidget {
             return null;
           }
         },
-        inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-        ],
+        inputFormatters: [CurrencyInputFormatter(fmt)],
         keyboardType: TextInputType.numberWithOptions(decimal: true),
       ),
     );
@@ -525,6 +573,7 @@ class PhoneTextFormField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final phoneFormatter = PhoneInputFormatter();
     return TypedTextFormField<String>(
       autofocus: autofocus,
       focusNode: focusNode,
@@ -539,11 +588,18 @@ class PhoneTextFormField extends StatelessWidget {
             hintText: '123-456-7890',
           ),
       spec: TypedTextFormFieldSpec(
-        serialize: (x) => x ?? '',
+        serialize:
+            (x) =>
+                x != null
+                    ? phoneFormatter
+                        .formatEditUpdate(
+                          TextEditingValue.empty,
+                          TextEditingValue(text: x),
+                        )
+                        .text
+                    : '',
         deserialize: (x) => x,
-        inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s()]+')),
-        ],
+        inputFormatters: [PhoneInputFormatter()],
         keyboardType: TextInputType.phone,
         validator: (value) {
           if (value == null || value.isEmpty) return null;
@@ -554,6 +610,96 @@ class PhoneTextFormField extends StatelessWidget {
           return null;
         },
       ),
+    );
+  }
+}
+
+// Nuevo: campo para ingresar múltiples tags
+class TagsInputField extends StatefulWidget {
+  const TagsInputField({
+    super.key,
+    this.initialTags = const [],
+    required this.onChanged,
+    this.decoration,
+  });
+
+  final List<String> initialTags;
+  final ValueChanged<List<String>> onChanged;
+  final InputDecoration? decoration;
+
+  @override
+  State<TagsInputField> createState() => _TagsInputFieldState();
+}
+
+class _TagsInputFieldState extends State<TagsInputField> {
+  late List<String> _tags;
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _tags = List.from(widget.initialTags);
+    _controller = TextEditingController();
+  }
+
+  void _addTag(String value) {
+    final tag = value.trim();
+    if (tag.isEmpty) return;
+    if (!_tags.contains(tag)) {
+      setState(() {
+        _tags.add(tag);
+      });
+      widget.onChanged(List.from(_tags));
+    }
+  }
+
+  void _onSubmitted(String value) {
+    _addTag(value);
+    _controller.clear();
+  }
+
+  void _onChanged(String value) {
+    if (value.contains(',')) {
+      final parts = value.split(',');
+      for (var i = 0; i < parts.length - 1; i++) {
+        _addTag(parts[i]);
+      }
+      _controller.text = parts.last;
+      _controller.selection = TextSelection.collapsed(
+        offset: _controller.text.length,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: [
+        ..._tags.map(
+          (tag) => Chip(
+            label: Text(tag),
+            onDeleted: () {
+              setState(() {
+                _tags.remove(tag);
+              });
+              widget.onChanged(List.from(_tags));
+            },
+          ),
+        ),
+        SizedBox(
+          width: 100,
+          child: TextField(
+            controller: _controller,
+            decoration:
+                widget.decoration?.copyWith(hintText: '') ??
+                const InputDecoration(hintText: 'Agregar tag'),
+            onSubmitted: _onSubmitted,
+            onChanged: _onChanged,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -661,36 +807,53 @@ class _TypedTextFormFieldState<T> extends State<TypedTextFormField<T>> {
     }
   }
 
+  void _applyFormat() {
+    final formatted = widget.spec.serialize(
+      widget.spec.deserialize(_controller.text),
+    );
+    if (formatted != _controller.text) {
+      _controller.value = TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
+      _lastExternalValue = formatted;
+    }
+  }
+
   void _onTextChanged() {
-    // Si el texto cambia mientras el campo tiene el foco, es una edición del usuario
     if (_focusNode.hasFocus && _controller.text != _lastExternalValue) {
       _userEditing = true;
-
-      // Validar el texto
       _validateText();
-
-      // Aplicar debounce si está configurado
       if (widget.debounceTime != null) {
         _debounceOnChanged();
       } else {
-        // Llamar directamente a onChanged si no hay debounce
-        widget.onChanged(widget.spec.deserialize(_controller.text));
+        final deserialized = widget.spec.deserialize(_controller.text);
+        widget.onChanged(deserialized);
+        // Aplicar formato inmediato si hay inputFormatters de moneda o teléfono
+        if (widget.spec.inputFormatters.any(
+          (f) => f is CurrencyInputFormatter || f is PhoneInputFormatter,
+        )) {
+          _applyFormat();
+        }
       }
     }
   }
 
   void _debounceOnChanged() {
-    // Cancelar el timer anterior si existe
     if (_debounceTimer?.isActive ?? false) {
       _debounceTimer!.cancel();
     }
-
-    // Crear un nuevo timer
     _debounceTimer = Timer(
       widget.debounceTime ?? const Duration(milliseconds: 300),
       () {
-        if (mounted) {
-          widget.onChanged(widget.spec.deserialize(_controller.text));
+        if (!mounted) return;
+        final deserialized = widget.spec.deserialize(_controller.text);
+        widget.onChanged(deserialized);
+        // Aplicar formato tras debounce
+        if (widget.spec.inputFormatters.any(
+          (f) => f is CurrencyInputFormatter || f is PhoneInputFormatter,
+        )) {
+          _applyFormat();
         }
       },
     );
@@ -730,6 +893,12 @@ class _TypedTextFormFieldState<T> extends State<TypedTextFormField<T>> {
           _debounceTimer!.cancel();
           widget.onChanged(widget.spec.deserialize(_controller.text));
         }
+
+        // Reformat al perder foco
+        final currentValue = widget.spec.deserialize(_controller.text);
+        final reformatted = widget.spec.serialize(currentValue);
+        _controller.text = reformatted;
+        _lastExternalValue = reformatted;
       }
     }
   }
@@ -866,6 +1035,17 @@ class _TypedTextFormFieldState<T> extends State<TypedTextFormField<T>> {
 
   @override
   Widget build(BuildContext context) {
+    // Decoración base: borde y espaciado uniforme
+    final baseDecoration =
+        widget.decoration ??
+        InputDecoration(
+          border: OutlineInputBorder(),
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 12,
+            horizontal: 16,
+          ),
+          hintText: widget.initialValue?.toString(),
+        );
     return Material(
       color: Colors.transparent,
       child: TextFormField(
@@ -875,12 +1055,8 @@ class _TypedTextFormFieldState<T> extends State<TypedTextFormField<T>> {
         autocorrect: false,
         obscureText: widget.obscureText,
         inputFormatters: widget.spec.inputFormatters,
-        decoration: (widget.decoration ??
-                InputDecoration(hintText: widget.initialValue?.toString()))
-            .copyWith(errorText: _errorText),
-        onChanged: (_) {
-          // La llamada real a onChanged se maneja en _onTextChanged con debounce
-        },
+        decoration: baseDecoration.copyWith(errorText: _errorText),
+        onChanged: (_) {},
         keyboardType: widget.spec.keyboardType,
       ),
     );

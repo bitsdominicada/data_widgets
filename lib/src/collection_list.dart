@@ -10,6 +10,7 @@ class CollectionList<T> extends StatelessWidget {
     required this.items,
     required this.itemBuilder,
     required this.onChange,
+    this.onAdd,
     this.keyBuilder,
     this.actions = const [CollectionAction.move, CollectionAction.delete],
     this.itemDecorator,
@@ -25,6 +26,7 @@ class CollectionList<T> extends StatelessWidget {
   final List<T> items;
   final Widget Function(BuildContext, T, int) itemBuilder;
   final ValueChanged<List<T>> onChange;
+  final VoidCallback? onAdd;
 
   final Key Function(T item)? keyBuilder;
   final List<CollectionAction> actions;
@@ -53,6 +55,7 @@ class CollectionList<T> extends StatelessWidget {
           onVisibleChanged: onVisibleChanged,
           onEndReached: onEndReached,
           padding: padding,
+          onAdd: onAdd,
         );
 
       case CollectionListMode.sliver:
@@ -69,6 +72,7 @@ class CollectionList<T> extends StatelessWidget {
           padding: padding,
           sliverHeader: sliverHeader,
           sliverFooter: sliverFooter,
+          onAdd: onAdd,
         );
 
       case CollectionListMode.animated:
@@ -81,6 +85,7 @@ class CollectionList<T> extends StatelessWidget {
           itemDecorator: itemDecorator,
           dismissibleDecorator: dismissibleDecorator,
           padding: padding,
+          onAdd: onAdd,
         );
     }
   }

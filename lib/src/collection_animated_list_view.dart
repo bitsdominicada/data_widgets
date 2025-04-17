@@ -7,6 +7,7 @@ class CollectionAnimatedListView<T> extends StatefulWidget {
     required this.initialItems,
     required this.itemBuilder,
     required this.onChanged,
+    this.onAdd,
     this.actions = const [CollectionAction.move, CollectionAction.delete],
     this.itemDecorator,
     this.dismissibleDecorator,
@@ -17,6 +18,7 @@ class CollectionAnimatedListView<T> extends StatefulWidget {
   final List<T> initialItems;
   final Widget Function(BuildContext context, T item, int index) itemBuilder;
   final ValueChanged<List<T>> onChanged;
+  final VoidCallback? onAdd;
   final List<CollectionAction> actions;
   final Widget Function(BuildContext, Widget)? itemDecorator;
   final Widget Function(BuildContext, Widget)? dismissibleDecorator;

@@ -15,18 +15,20 @@ class CollectionSliverListView<T> extends StatelessWidget {
     required this.items,
     required this.itemBuilder,
     required this.onChange,
+    this.onAdd,
     this.keyBuilder,
     this.actions = const [CollectionAction.move, CollectionAction.delete],
     this.itemDecorator,
     this.dismissibleDecorator,
     this.onVisibleChanged,
     this.onEndReached,
+    this.padding = const EdgeInsets.all(0),
     this.sliverHeader,
     this.sliverFooter,
-    this.padding = const EdgeInsets.all(0),
   });
 
   final List<T> items;
+  final VoidCallback? onAdd;
   final Widget Function(BuildContext context, T item, int index) itemBuilder;
   final ValueChanged<List<T>> onChange;
   final Key Function(T item)? keyBuilder;
@@ -51,6 +53,14 @@ class CollectionSliverListView<T> extends StatelessWidget {
           if (sliverHeader != null) SliverToBoxAdapter(child: sliverHeader!),
           _buildSliverList(context, visibleKeys),
           if (sliverFooter != null) SliverToBoxAdapter(child: sliverFooter!),
+          if (onAdd != null)
+            SliverToBoxAdapter(
+              child: ListTile(
+                leading: const Icon(Icons.add),
+                title: const Text('Agregar elemento'),
+                onTap: onAdd,
+              ),
+            ),
         ],
       ),
     );
@@ -72,11 +82,7 @@ class CollectionSliverListView<T> extends StatelessWidget {
         itemBuilder: (context, index) {
           final item = items[index];
           final key = keyBuilder?.call(item) ?? ValueKey(item);
-          return ReorderableDelayedDragStartListener(
-            key: key,
-            index: index,
-            child: _buildItem(context, item, index, key, visibleKeys),
-          );
+          return _buildItem(context, item, index, key, visibleKeys);
         },
       );
     } else {
@@ -98,6 +104,32 @@ class CollectionSliverListView<T> extends StatelessWidget {
     Set<Key> visibleKeys,
   ) {
     Widget child = itemBuilder(context, item, index);
+
+    // Mostrar ícono de handle si se permite mover
+    if (actions.contains(CollectionAction.move)) {
+      // Determinar tipo de listener según plataforma
+      final handleIcon = const Padding(
+        padding: EdgeInsets.only(right: 8.0),
+        child: Icon(Icons.drag_handle),
+      );
+      final platform = Theme.of(context).platform;
+      Widget handle;
+      if (platform == TargetPlatform.iOS ||
+          platform == TargetPlatform.android) {
+        handle = ReorderableDelayedDragStartListener(
+          key: ValueKey('handle-$index'),
+          index: index,
+          child: handleIcon,
+        );
+      } else {
+        handle = ReorderableDragStartListener(
+          key: ValueKey('handle-$index'),
+          index: index,
+          child: handleIcon,
+        );
+      }
+      child = Row(children: [handle, Expanded(child: child)]);
+    }
 
     if (itemDecorator != null) {
       child = itemDecorator!(context, child);
@@ -210,9 +242,15 @@ class _EditableTableSliverState extends State<EditableTableSliver> {
         children: [
           CustomScrollView(
             slivers: [
-              CollectionSliverListView<EditableItem>(
+              CollectionList<EditableItem>(
+                mode: CollectionListMode.sliver,
                 items: items,
                 onChange: (newItems) => setState(() => items = newItems),
+                onAdd:
+                    () => setState(
+                      () => items.add(EditableItem(name: '', quantity: 0)),
+                    ),
+                actions: const [CollectionAction.move, CollectionAction.delete],
                 sliverHeader: Container(
                   color: Colors.grey[200],
                   padding: const EdgeInsets.symmetric(
@@ -301,9 +339,25 @@ class _EditableTableSliverState extends State<EditableTableSliver> {
             right: 16.0,
             child: FloatingActionButton(
               onPressed: _forceUpdate,
+              heroTag: 'refresh_fab',
               child: const Icon(Icons.refresh),
               tooltip:
                   'Forzar actualización para probar ConcurrentChangePolicy',
+            ),
+          ),
+          // Botón para agregar nueva fila
+          Positioned(
+            bottom: 16.0,
+            left: 16.0,
+            child: FloatingActionButton(
+              onPressed: () {
+                setState(() {
+                  items.add(EditableItem(name: '', quantity: 0));
+                });
+              },
+              heroTag: 'add_fab',
+              child: const Icon(Icons.add),
+              tooltip: 'Agregar nueva fila',
             ),
           ),
         ],

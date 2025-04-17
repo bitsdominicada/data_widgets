@@ -15,6 +15,7 @@ class CollectionListView<T> extends StatelessWidget {
     this.onVisibleChanged,
     this.onEndReached,
     this.padding = const EdgeInsets.all(0),
+    this.onAdd,
   });
 
   final List<T> items;
@@ -28,10 +29,12 @@ class CollectionListView<T> extends StatelessWidget {
   final void Function(Set<Key> visibleKeys)? onVisibleChanged;
   final VoidCallback? onEndReached;
   final EdgeInsets padding;
+  final VoidCallback? onAdd;
 
   @override
   Widget build(BuildContext context) {
     final visibleKeys = <Key>{};
+    final totalItems = items.length + (onAdd != null ? 1 : 0);
 
     return NotificationListener<ScrollNotification>(
       onNotification: (scrollInfo) {
@@ -43,9 +46,17 @@ class CollectionListView<T> extends StatelessWidget {
         return false;
       },
       child: ListView.builder(
-        itemCount: items.length,
+        itemCount: totalItems,
         padding: padding,
         itemBuilder: (context, index) {
+          // Si es la última posición y tenemos onAdd, mostrar botón Agregar
+          if (onAdd != null && index == items.length) {
+            return ListTile(
+              leading: const Icon(Icons.add),
+              title: const Text('Agregar elemento'),
+              onTap: onAdd,
+            );
+          }
           final item = items[index];
           final key = keyBuilder?.call(item) ?? ValueKey(item);
 

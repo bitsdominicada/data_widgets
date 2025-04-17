@@ -108,6 +108,9 @@ class _FormFieldsDemoState extends State<FormFieldsDemo> {
   double? _height;
   UserRole _selectedRole = UserRole.viewer;
   DateTime? _birthDate;
+  String? _phoneNumber;
+  String? _currency;
+  List<String> _tags = [];
 
   String _getRoleName(UserRole role) {
     switch (role) {
@@ -232,7 +235,46 @@ class _FormFieldsDemoState extends State<FormFieldsDemo> {
                 lastDate: DateTime.now(),
               ),
               const SizedBox(height: 24),
-
+              //Currency
+              const Text(
+                'Campo de moneda',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              CurrencyTextFormField(
+                initialValue: 1000,
+                onChanged:
+                    (value) => setState(() => _currency = value.toString()),
+                selectAllOnFocus: true,
+                // decimalDigits: 2,
+                // onChangedCurrency: (value) => print('Valor cambiado: $value'),
+              ),
+              const SizedBox(height: 16),
+              //Phone
+              const Text(
+                'Campo de teléfono',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              PhoneTextFormField(
+                initialValue: '+34 123 456 789',
+                onChanged: (value) => setState(() => _phoneNumber = value),
+                selectAllOnFocus: true,
+                // countryCode: '+34',
+                // onChangedPhone: (value) => print('Valor cambiado: $value'),
+              ),
+              const SizedBox(height: 16),
+              const Text('Tags', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              TagsInputField(
+                initialTags: _tags,
+                onChanged: (tags) => setState(() => _tags = tags),
+                // decoration: const InputDecoration(
+                //   prefixIcon: Icon(Icons.tag),
+                //   border: OutlineInputBorder(),
+                // ),
+              ),
+              const SizedBox(height: 24),
               const Text(
                 'Valores actuales:',
                 style: TextStyle(fontWeight: FontWeight.bold),
@@ -247,6 +289,10 @@ class _FormFieldsDemoState extends State<FormFieldsDemo> {
               Text(
                 'Fecha de nacimiento: ${_birthDate != null ? "${_birthDate!.day}/${_birthDate!.month}/${_birthDate!.year}" : "No seleccionada"}',
               ),
+              Text('Teléfono: $_phoneNumber'),
+              Text('Moneda: $_currency'),
+              Text('Tags: ${_tags.join(", ")}'),
+              const SizedBox(height: 16),
             ],
           ),
         ),
